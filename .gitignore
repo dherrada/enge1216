@@ -1,1 +1,15 @@
+# SPDX-FileCopyrightText: 2021 Dylan Herrada
+#
+# SPDX-License-Identifier: Unlicense
 secrets.py
+*.mpy
+.idea
+__pycache__
+_build
+*.pyc
+.env
+bundles
+*.DS_Store
+.eggs
+dist
+**/*.egg-info

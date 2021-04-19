@@ -1,3 +1,4 @@
+# pylint: disable=global-statement
 # SPDX-FileCopyrightText: 2021 ladyada for Adafruit Industries
 # SPDX-FileCopyrightText: 2021 Dylan Herrada for Adafruit Industries
 # SPDX-FileCopyrightText: 2021 Hayden Perry
@@ -9,7 +10,7 @@ import time
 import math
 import board
 import busio
-from digitalio import DigitalInOut, Direction, Pull
+from digitalio import DigitalInOut, Direction
 from adafruit_esp32spi import adafruit_esp32spi
 from adafruit_esp32spi import adafruit_esp32spi_wifimanager
 import adafruit_esp32spi.adafruit_esp32spi_socket as socket
@@ -21,6 +22,7 @@ import displayio
 import terminalio
 from adafruit_display_text import label
 import adafruit_displayio_ssd1306
+
 ### WiFi ###
 
 # Get wifi details and more from a secrets.py file
@@ -50,27 +52,27 @@ wifi = adafruit_esp32spi_wifimanager.ESPSPI_WiFiManager(esp, secrets, status_lig
 RELAY = DigitalInOut(board.D10)
 RELAY.direction = Direction.OUTPUT
 
-year = 0
-month = 0
-day = 0
-hour = 0
-minute = 0
-second = 0
-wday = 0
+YEAR = 0
+MONTH = 0
+DAY = 0
+HOUR = 0
+MINUTE = 0
+SECOND = 0
+WDAY = 0
 
 # UTC timezone difference
-tz = -4
+TZ = -4
 
-skip = True
-ready = False
-alarm = False
+SKIP = True
+READY = False
+ALARM = False
+ALARM_TIME = None
+ALARM_DAYS = None
+RING_TODAY = None
 # Define callback functions which will be called when certain events happen.
 # pylint: disable=unused-argument
 def connected(client):
-    # Connected function will be called when the client is connected to Adafruit IO.
-    # This is a good place to subscribe to feed changes.  The client parameter
-    # passed to this function is the Adafruit IO MQTT client so you can make
-    # calls against it easily.
+    """Connected function will be called when the client is connected to Adafruit IO."""
     print("Connected to Adafruit IO!")
 
     # Subscribe to all messages in the enge-1216 group
@@ -89,31 +91,31 @@ def connected(client):
     # https://io.adafruit.com/api/docs/mqtt.html#adafruit-io-monitor
     io.subscribe_to_time("hours")
 
+
 def subscribe(client, userdata, topic, granted_qos):
-    # This method is called when the client subscribes to a new feed.
+    """ This method is called when the client subscribes to a new feed."""
     print("Subscribed to {0} with QOS level {1}".format(topic, granted_qos))
 
 
 def unsubscribe(client, userdata, topic, pid):
-    # This method is called when the client unsubscribes from a feed.
+    """ This method is called when the client unsubscribes from a feed."""
     print("Unsubscribed from {0} with PID {1}".format(topic, pid))
 
 
 # pylint: disable=unused-argument
 def disconnected(client):
-    # Disconnected function will be called when the client disconnects.
+    """ Disconnected function will be called when the client disconnects. """
     print("Disconnected from Adafruit IO!")
 
 
 # pylint: disable=unused-argument
 def on_message(client, feed_id, payload):
-    # Message function will be called when a subscribed feed has a new value.
-    # The feed_id parameter identifies the feed, and the payload parameter has
-    # the new value.
+    """ Message function will be called when a subscribed feed has a new value. """
     print("Feed {0} received new value: {1}".format(feed_id, payload))
 
 
 def on_digital_msg(client, topic, message):
+    """ Feed callback function that runs when the digital feed has a new value. """
     print(f"Feed {topic}: {message}")
     if message == "ON":
         RELAY.value = True
@@ -122,102 +124,113 @@ def on_digital_msg(client, topic, message):
     else:
         print("Well, that wasn't supposed to happen")
 
-def on_iso_msg(client, topic, message):
-    # Sorry about that, globals were honestly the best way to do this
-    global year, month, day, hour, minute, second, wday
-    print(message)
-    date, time = message.split("T")
-    year, month, day = [int(i) for i in date.split("-")]
-    hour, minute, second = time.split(":")
-    second = second.split('.')[0]
-    hour = int(hour)
-    minute = int(minute)
-    second = int(second)
 
-    #hour = hour - 2
-    if hour + tz < 0:
-        day -= 1
-        if day == 0:
-            if month % 2:
-                day = 31
+def on_iso_msg(client, topic, message):
+    """ Feed callback function that runs when the time/ISO8601 feed has a new value. """
+    # Sorry about that, globals were honestly the best way to do this
+    global YEAR, MONTH, DAY, HOUR, MINUTE, SECOND, WDAY
+    print(message)
+    date, time_1 = message.split("T")
+    YEAR, MONTH, DAY = [int(i) for i in date.split("-")]
+    HOUR, MINUTE, SECOND = time_1.split(":")
+    SECOND = SECOND.split(".")[0]
+    HOUR = int(HOUR)
+    MINUTE = int(MINUTE)
+    SECOND = int(SECOND)
+
+    if HOUR + TZ < 0:
+        DAY -= 1
+        if DAY == 0:
+            if MONTH % 2:
+                DAY = 31
             else:
-                day = 30
-            month -= 1
-            if month == 0:
-                month = 12
-            elif month == 2:
-                if not year % 4:
-                    if not year % 400:
-                        day = 29
+                DAY = 30
+            MONTH -= 1
+            if MONTH == 0:
+                MONTH = 12
+            elif MONTH == 2:
+                if not YEAR % 4:
+                    if not YEAR % 400:
+                        DAY = 29
                 else:
-                    day = 28
-                
-    hour = (int(hour) + tz + 24) % 24
+                    DAY = 28
+
+    HOUR = (int(HOUR) + TZ + 24) % 24
 
     # could add something for UTC+X
 
-    k = day
-    m = month - 2
-    if month < 2:
-        m = month + 10
-    year1 = str(year)
-    y = int(year1[2:])
-    c = int(year1[:2])
+    _k = DAY
+    _m = MONTH - 2
+    if MONTH < 2:
+        _m = MONTH + 10
+    year1 = str(YEAR)
+    _y = int(year1[2:])
+    _c = int(year1[:2])
     # 0.001 is band-aid fix for likely error at math.floor or lower
-    wday = (k + math.floor(2.6*m - 0.2 + 0.01) - 2*c + y + math.floor(y / 4) + math.floor(c / 4)) % 7
-    #print(year, month, day, hour, minute, second, wday)
-    #print(alarm_time[0], type(alarm_time[0]), hour, type(hour))
-    #print(alarm_time[1], type(alarm_time[1]), minute, type(minute))
-    if alarm_time[0] == hour and alarm_time[1] == minute:
+    # fmt: off
+    # pylint: disable=line-too-long
+    WDAY = (_k + math.floor(2.6 * _m - 0.2 + 0.01) - 2 * _c + _y + math.floor(_y / 4) + math.floor(_c / 4)) % 7
+    # pylint: enable=line-too-long
+    # fmt: on
+    # print(YEAR, MONTH, DAY, HOUR, MINUTE, SECOND, WDAY)
+    if ALARM_TIME[0] == HOUR and ALARM_TIME[1] == MINUTE:
         print("RING")
         ring()
-    elif alarm:
+    elif ALARM:
         io.publish("enge-1216.alarm", 0)
 
+
 def ring():
-    if ready:
-        if ring_today:
-            if not alarm:
+    """ Rings the alarm """
+    if READY:
+        if RING_TODAY:
+            if not ALARM:
                 io.publish("enge-1216.alarm", 1)
-            if not skip:
+            if not SKIP:
                 RELAY.value = not RELAY.value
-            if skip:
+            if SKIP:
                 io.publish("enge-1216.skip-next-alarm", "OFF")
                 time.sleep(60)
 
+
 def on_time(client, topic, message):
-    global alarm_time
-    alarm_time = [int(i) for i in message.split(':')]
+    """ Feed callback function that runs when the alarm-time feed has a new value. """
+    global ALARM_TIME
+    ALARM_TIME = [int(i) for i in message.split(":")]
     print(f"Feed {topic}: {message}")
 
+
 weekdays = {0: "Su", 1: "Mo", 2: "Tu", 3: "We", 4: "Th", 5: "Fr", 6: "Sa"}
-reversed_weekdays = {value : key for (key, value) in weekdays.items()}
+reversed_weekdays = {value: key for (key, value) in weekdays.items()}
+
 
 def on_days(client, topic, message):
-    global alarm_days, ring_today
+    """ Feed callback function that runs when the alarm-default-days feed has a new value. """
+    global ALARM_DAYS, RING_TODAY
     print(message)
-    alarm_days = message.split(',')
-    if weekdays[wday] in alarm_days:
-        ring_today = True
-    else:
-        ring_today = False
+    ALARM_DAYS = message.split(",")
+    RING_TODAY = bool(weekdays[WDAY] in ALARM_DAYS)
+
 
 def on_skip(client, topic, message):
-    global skip
+    """ Feed callback function that runs when the skip-next-alarm feed has a new value. """
+    global SKIP
     if message == "SKIP":
-        skip = True
+        SKIP = True
     elif message == "OFF":
-        skip = False
+        SKIP = False
+
 
 def on_hours(client, topic, message):
+    """ Feed callback function that runs when the time/hours feed has a new value. """
     io.get("enge-1216.digital")
 
+
 def on_alarm(client, topic, message):
-    global alarm
-    if message == "1":
-        alarm = True
-    else:
-        alarm = False
+    """ Feed callback function that runs when the alarm feed has a new value. """
+    global ALARM
+    ALARM = bool(message == "1")
+
 
 i2c = board.I2C()
 display_bus = displayio.I2CDisplay(i2c, device_address=0x3C)
@@ -292,16 +305,16 @@ io.get("enge-1216.skip-next-alarm")
 
 io.loop()
 
-ready = True
+READY = True
 # Start a blocking loop to check for new messages
 while True:
     try:
         io.loop()
         splash[0].text = "Lamp: " + str(RELAY.value)
-        splash[1].text = "Alarm time: " + ":".join([str(i) for i in alarm_time])
-        splash[2].text = ",".join([str(i) for i in alarm_days])
-    except (ValueError, RuntimeError) as e:
-        print("Failed to get data, retrying\n", e)
+        splash[1].text = "Alarm time: " + ":".join([str(i) for i in ALARM_TIME])
+        splash[2].text = ",".join([str(i) for i in ALARM_DAYS])
+    except (ValueError, RuntimeError) as err:
+        print("Failed to get data, retrying\n", err)
         wifi.reset()
         io.reconnect()
         continue
